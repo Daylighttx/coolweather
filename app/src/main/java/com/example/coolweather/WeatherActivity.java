@@ -14,6 +14,7 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -32,7 +33,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -139,7 +145,7 @@ public class WeatherActivity  extends AppCompatActivity {
         if(bingPic!=null){
             Glide.with(this).load(bingPic).into(bingPicImg);
         }else {
-                loadBingPic();
+            getImage();
         }
 
         navButton.setOnClickListener(new View.OnClickListener() {
@@ -196,7 +202,7 @@ public class WeatherActivity  extends AppCompatActivity {
 
             }
         });
-        loadBingPic();
+        getImage();
 
     }
 
@@ -249,85 +255,67 @@ public class WeatherActivity  extends AppCompatActivity {
 
     }
 
-    private void loadBingPic()  {
-        String requestBingPic = "http://guolin.tech/api/bing_pic";
-
-        HttpUtil.sendOkHttpRequest(requestBingPic, new Callback() {
+    private void loadBingPic(final String response)  {
+        final String bingPic = response;
+        Log.d("123", bingPic);
+        SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this).edit();
+        editor.putString("bing_pic", bingPic);
+        editor.apply();
+        runOnUiThread(new Runnable() {
             @Override
-            public void onFailure(Call call, IOException e) {
-                e.printStackTrace();
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-
-                final String bingPic = response.body().string();
-                SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(WeatherActivity.this).edit();
-                editor.putString("bing_pic", bingPic);
-                editor.apply();
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Glide.with(WeatherActivity.this).load(bingPic).into(bingPicImg);
-                    }
-                });
-
+            public void run() {
+                Glide.with(WeatherActivity.this).load(bingPic).into(bingPicImg);
             }
         });
     }
 
-    private String getUrl(String api) throws ExecutionException, InterruptedException {
-
-        final String apiurl = api;
 
 
-        Callable callable = new Callable() {
+    private void getImage(){
+        final String bingUrl = "https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1";
+        new Thread(new Runnable() {
             @Override
-            public Object call() throws Exception {
-                String jsonurl = "";
-
-                OkHttpClient client = new OkHttpClient();
-
-                Request request = new Request.Builder().url(apiurl).build();
-
-                String responseJson = null;
+            public void run() {
+//优化图片的请求方式
                 try {
-                    Response response = client.newCall(request).execute();
-                    responseJson = response.body().string();
-                } catch (IOException e) {
+                    OkHttpClient client = new OkHttpClient();
+                    Request request = new Request.Builder()
+                            .url(bingUrl)
+                            .build();
+                    Response response = null;
+                    response = client.newCall(request).execute();
+                    parseJSONWithJSONObject(response.body().string());
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
-
-                try {
-                    JSONObject jsonObject1 = new JSONObject(responseJson);
-                    JSONArray jsonArray = jsonObject1.getJSONArray("images");
-                    for (int i = 0; i < jsonArray.length(); i++) {
-                        JSONObject jsonObject = (JSONObject) jsonArray.get(i);
-                        jsonurl = jsonObject.getString("url");
-                    }
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-
-                Log.e(jsonurl, jsonurl);
-
-                String backurl = "https://cn.bing.com" + jsonurl;
-                return backurl;
-
             }
-        };
-
-        FutureTask<String> futureTask = new FutureTask<String>(callable);
-
-        new Thread(futureTask).start();
-
-        Log.e(futureTask.get(),futureTask.get());
-
-
-
-        return futureTask.get();
+        }).start();
 
     }
+
+    private void parseJSONWithJSONObject(String jsonData){
+
+        try {
+
+            JSONArray jsonArray = new JSONObject(jsonData).getJSONArray("images");
+
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                String url = jsonObject.getString("url");
+
+                Log.d("123", "url is " + url);
+                String picurl="http://cn.bing.com"+url;
+                Log.d("123",picurl);
+                loadBingPic(picurl);
+
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
 
 
 }

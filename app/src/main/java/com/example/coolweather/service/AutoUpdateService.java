@@ -8,15 +8,25 @@ import android.content.SharedPreferences;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
+import android.util.Log;
+import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
+import com.example.coolweather.WeatherActivity;
 import com.example.coolweather.gson.Weather;
 import com.example.coolweather.util.HttpUtil;
 import com.example.coolweather.util.Utility;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import okhttp3.Response;
 
 public class AutoUpdateService extends Service {
@@ -76,24 +86,53 @@ public class AutoUpdateService extends Service {
     }
 
     private void updateBingPic(){
-        String requestBingPic = "http://guolin.tech/api/bing_pic";
-
-        HttpUtil.sendOkHttpRequest(requestBingPic, new Callback() {
+        final String bingUrl = "https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1";
+        new Thread(new Runnable() {
             @Override
-            public void onFailure(Call call, IOException e) {
-                e.printStackTrace();
+            public void run() {
+//优化图片的请求方式
+                try {
+                    OkHttpClient client = new OkHttpClient();
+                    Request request = new Request.Builder()
+                            .url(bingUrl)
+                            .build();
+                    Response response = null;
+                    response = client.newCall(request).execute();
+                    parseJSONWithJSONObject(response.body().string());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
+        }).start();
+    }
 
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
+    private void loadBingPic(final String response)  {
+        final String bingPic = response;
+        Log.e("test", bingPic);
+        SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(AutoUpdateService.this).edit();
+        editor.putString("bing_pic", bingPic);
+        editor.apply();
+    }
 
-                String bingPic = response.body().string();
-                SharedPreferences.Editor editor = PreferenceManager.
-                        getDefaultSharedPreferences(AutoUpdateService.this).edit();
-                editor.putString("bing_pic", bingPic);
-                editor.apply();
 
+    private void parseJSONWithJSONObject(String jsonData){
+
+        try {
+            // JSONArray jsonArray = new JSONArray(jsonData);
+
+            JSONArray jsonArray = new JSONObject(jsonData).getJSONArray("images");
+
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                String url = jsonObject.getString("url");
+
+                Log.d("MainActivity", "url is " + url);
+                String url1="http://cn.bing.com"+url;
+                loadBingPic(url1);
             }
-        });
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
     }
 }

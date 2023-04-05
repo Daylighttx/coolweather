@@ -1,6 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
+    signingConfigs {
+        release {
+            storeFile file('I:\\android\\test_demo.jks')
+            storePassword '123456'
+            keyAlias = 'tx'
+            keyPassword '123456'
+        }
+    }
     compileSdkVersion 33
     buildToolsVersion "33.0.1"
     defaultConfig {
@@ -10,6 +18,7 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        signingConfig signingConfigs.release
     }
     buildTypes {
         release {
